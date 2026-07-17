@@ -55,11 +55,12 @@ function Explore() {
         <div className="container-fluid">
             <div className="row">
                 <div className="col-12 px-5 pb-5">
-                    <div className="d-flex flex-wrap justify-content-center justify-content-md-start gap-4 mt-5">
+                    <div className="row g-4 mt-5">
                         {loading ? (
                             Array.from({ length: 8 }).map((_, index) => (
-                                <div className="card px-0 border-0 listing-card explore-card" key={index}>
-                                    <div className="skeleton skeleton-img"></div>
+                                <div className="col-12 col-sm-6 col-md-4 col-lg-3" key={index}>
+                                    <div className="card px-0 border-0 listing-card h-100">
+                                        <div className="skeleton skeleton-img"></div>
                                     <div className="card-body">
                                         <div className="d-flex justify-content-between mb-2">
                                             <div className="skeleton skeleton-text w-75"></div>
@@ -74,6 +75,7 @@ function Explore() {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
                             ))
                         ) : currentItems.length === 0 ? (
                             <div className="col-12 text-center py-5 mt-5">
@@ -83,8 +85,9 @@ function Explore() {
                         ) : (
                             currentItems.map((listing) => {
                                 return (
-                                    <NavLink className="card px-0 border-0 listing-card explore-card" key={listing._id} to={`/listing/${listing._id}`}>
-                                        <LazyImage src={listing?.images?.mainImage?.startsWith?.('http') ? listing.images.mainImage : `${import.meta.env.VITE_BACKEND_URL}/uploads/${listing?.images?.mainImage}`} className="card-img-top" alt="listing image" />
+                                    <div className="col-12 col-sm-6 col-md-4 col-lg-3" key={listing._id}>
+                                        <NavLink className="card px-0 border-0 listing-card h-100" to={`/listing/${listing._id}`}>
+                                            <LazyImage src={listing?.images?.mainImage?.startsWith?.('http') ? listing.images.mainImage : `${import.meta.env.VITE_BACKEND_URL}/uploads/${listing?.images?.mainImage}`} className="card-img-top" alt="listing image" />
                                         <div className="card-img-overlay d-flex flex-column">
                                             <div className="d-flex justify-content-end">
                                                 <div className="favorite-btn text-white">
@@ -107,6 +110,7 @@ function Explore() {
                                             </div>
                                         </div>
                                     </NavLink>
+                                </div>
                                 )
                             })
                         )}
