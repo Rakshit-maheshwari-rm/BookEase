@@ -1,4 +1,4 @@
-# BookEase — Full Stack Learning Project
+# BookEase — Full Stack Project
 A full-stack property booking web application built using **HTML, CSS, Bootstrap, React.js, Node.js, Express.js, and MongoDB**.  
 
 ## Project Overview
