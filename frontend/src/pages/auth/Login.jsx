@@ -59,20 +59,32 @@ function Login() {
                             <div className="mb-3">
                                 <label className="form-label">Email Address</label>
                                 <input type="email" name="email" placeholder="name@example.com" className="form-control"
-                                    required onChange={handleChange} />
+                                    required onChange={handleChange} value={form.email} />
                             </div>
                             <div className="mb-4">
                                 <label className="form-label">Password</label>
                                 <input type="password" name="password" placeholder="*********"
-                                    className="form-control" required onChange={handleChange} />
+                                    className="form-control" required onChange={handleChange} value={form.password} />
                             </div>
                             <button type="submit" className="btn btn-primary w-100 py-2">
                                 Sign In
                             </button>
-                            <p className="text-center mt-4 mb-0">
+                            <p className="text-center mt-4 mb-3">
                                 Don't have an account?
                                 <Link to="/signup" className="ms-2 auth-link">Create Account</Link>
                             </p>
+
+                            <div className="d-flex align-items-center mb-4 mt-2">
+                                <hr className="flex-grow-1 border-light opacity-25" />
+                                <span className="mx-3 text-white-50 small text-uppercase">or quick login</span>
+                                <hr className="flex-grow-1 border-light opacity-25" />
+                            </div>
+
+                            <div className="d-flex justify-content-between gap-3">
+                                <button type="button" className="btn btn-dark border border-secondary border-opacity-50 rounded-3 shadow-sm flex-fill py-2 fw-semibold text-white-50 btn-hover-light" onClick={() => setForm({ email: 'admin@example.com', password: 'admin123' })}>Admin</button>
+                                <button type="button" className="btn btn-dark border border-secondary border-opacity-50 rounded-3 shadow-sm flex-fill py-2 fw-semibold text-white-50 btn-hover-light" onClick={() => setForm({ email: 'lindamillerhost@example.com', password: 'host123' })}>Host</button>
+                                <button type="button" className="btn btn-dark border border-secondary border-opacity-50 rounded-3 shadow-sm flex-fill py-2 fw-semibold text-white-50 btn-hover-light" onClick={() => setForm({ email: 'richardsmith@example.com', password: 'user123' })}>User</button>
+                            </div>
                         </form>
                     </div>
                 </div>
