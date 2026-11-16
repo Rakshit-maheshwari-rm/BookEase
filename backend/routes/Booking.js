@@ -8,6 +8,7 @@ router.post('/verify-payment', isLoggedIn, BookingController.verifyPayment);
 router.get('/get-booking', isLoggedIn, BookingController.get);
 router.get('/all-booking', isLoggedIn, BookingController.host);
 router.put('/:id', isLoggedIn, BookingController.updateStatus);
+router.get('/:id/itinerary', isLoggedIn, BookingController.getItinerary);
 
 // Admin Routes
 router.get('/admin/all', isLoggedIn, isAdmin, BookingController.adminGetAll);

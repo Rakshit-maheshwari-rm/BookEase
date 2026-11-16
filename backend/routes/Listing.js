@@ -11,6 +11,10 @@ router.get('/explore', cacheMiddleware(300), ListingController.explore);
 router.get('/destination-finder', cacheMiddleware(300), ListingController.destinationFinder);
 router.delete('/host-delete/:id', isLoggedIn, ListingController.hostDelete);
 router.get('/host-listings', isLoggedIn, ListingController.getHostListing);
+router.post('/ai-search', ListingController.aiSearch);
+router.post('/ai-generate-copy', isLoggedIn, ListingController.generateCopy);
+router.post('/ai-suggest-pricing', isLoggedIn, ListingController.suggestPricing);
+
 // Admin Routes
 router.get('/admin/all', isLoggedIn, isAdmin, ListingController.adminGetAll);
 router.put('/admin/:id/status', isLoggedIn, isAdmin, ListingController.adminUpdateStatus);

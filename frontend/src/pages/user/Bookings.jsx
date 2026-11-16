@@ -6,13 +6,16 @@ import { toast } from 'react-toastify';
 import Pagination from "../../components/Pagination";
 import { usePagination } from '../../hooks/usePagination';
 import { useCurrency } from '../../context/CurrencyContext';
+import AIItineraryModal from '../../components/AIItineraryModal';
 
 function Bookings() {
     const [booking, setBooking] = useState([]);
+    const [selectedBookingForItinerary, setSelectedBookingForItinerary] = useState(null);
+    const [showItineraryModal, setShowItineraryModal] = useState(false);
     const { formatPrice } = useCurrency();
     useEffect(() => {
         axios.get(`${import.meta.env.VITE_BACKEND_URL}/booking/get-booking`, { withCredentials: true }).then((res) => {
-            setBooking(res.data.booking)
+            setBooking(res.data.booking);
         }).catch((err) => {
             toast.error('Failed to fetch bookings!');
         });
@@ -31,6 +34,11 @@ function Bookings() {
         } catch (err) {
             toast.error("Failed to cancel booking");
         }
+    };
+
+    const handleOpenItinerary = (book) => {
+        setSelectedBookingForItinerary(book);
+        setShowItineraryModal(true);
     };
 
     const { activePage, currentItems, handlePageChange, totalItems, itemsPerPage } = usePagination(booking, 10);
@@ -76,6 +84,12 @@ function Bookings() {
                                                 disabled={book?.status !== 'pending'}>
                                                 Cancel
                                             </button>
+                                            <button
+                                                type="button"
+                                                className="btn btn-sm text-white rounded-pill px-3 ai-vibe-btn d-flex align-items-center gap-1"
+                                                onClick={() => handleOpenItinerary(book)}>
+                                                <i className="fa-solid fa-wand-magic-sparkles"></i> AI Itinerary
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -112,8 +126,18 @@ function Bookings() {
                     <li><strong className="text-white">Support:</strong> For immediate assistance or special requests, please contact our 24/7 customer support via the Help Center.</li>
                 </ul>
             </div>
+
+            <AIItineraryModal
+                show={showItineraryModal}
+                onClose={() => {
+                    setShowItineraryModal(false);
+                    setSelectedBookingForItinerary(null);
+                }}
+                bookingId={selectedBookingForItinerary?.bookingId || selectedBookingForItinerary?._id}
+                bookingTitle={selectedBookingForItinerary?.listing?.title}
+            />
         </div>
-    )
+    );
 }
 
 export default Bookings;

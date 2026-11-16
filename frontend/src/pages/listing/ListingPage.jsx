@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { AuthContext } from "../../context/AuthContext";
 import LazyImage from "../../components/LazyImage";
 import { useCurrency } from "../../context/CurrencyContext";
+import AIReviewSummary from "../../components/AIReviewSummary";
 
 function ListingPage() {
     const { id } = useParams();
@@ -317,7 +318,8 @@ function ListingPage() {
                         </div>
                     </div>
                     <div className="border-top mt-4 pt-5">
-                        <h4>Reviews ({totalRatings} reviews)</h4>
+                        <h4 className="mb-4">Reviews ({totalRatings} reviews)</h4>
+                        <AIReviewSummary listingId={id} />
                         <div className="row g-3 pt-3">
                             {listing?.reviews?.map((review, index) => {
                                 return (

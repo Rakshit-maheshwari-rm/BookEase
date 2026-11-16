@@ -30,7 +30,7 @@ function HomePage() {
             <Accommodations listings={listingData} loading={loading} />
             <Lodging />
             <Listings listings={listingData} loading={loading} />
-            <Review review={listingData} />
+            <Review />
             <Newsletter />
         </>
     )

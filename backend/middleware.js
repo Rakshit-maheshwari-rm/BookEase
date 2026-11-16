@@ -1,6 +1,32 @@
 const NodeCache = require("node-cache");
 const myCache = new NodeCache();
 
+module.exports.myCache = myCache;
+
+module.exports.invalidateListingCache = (listingId) => {
+  try {
+    const allKeys = myCache.keys();
+    const keysToDelete = allKeys.filter((key) => {
+      if (listingId && key.includes(listingId.toString())) return true;
+      if (
+        key.startsWith("/listing/explore") ||
+        key.startsWith("/listing/all") ||
+        key.startsWith("/listing/search") ||
+        key.startsWith("/listing/destination-finder")
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    if (keysToDelete.length > 0) {
+      myCache.del(keysToDelete);
+    }
+  } catch (err) {
+    console.error("Cache invalidation error:", err);
+  }
+};
+
 module.exports.isLoggedIn = (req, res, next) => {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ error: "You must be logged in" });

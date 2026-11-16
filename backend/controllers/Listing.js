@@ -1,31 +1,21 @@
 const Listing = require("../models/Listing");
 const Notification = require("../models/Notification");
 const Rating = require("../models/Rating");
+const User = require("../models/User");
+const NodeCache = require("node-cache");
+const { parseSearch, generateListingCopy, suggestPricing } = require("../services/aiService");
+const { invalidateListingCache } = require("../middleware");
+
+const aiSearchCache = new NodeCache({ stdTTL: 600, useClones: false });
 
 const attachRatings = async (listings) => {
-  const listingIds = listings.map((l) => l._id);
-  const allReviews = await Rating.find({ listing: { $in: listingIds } }).populate(
-    "owner",
-    "username createdAt image description"
-  );
-
-  const reviewsByListing = {};
-  allReviews.forEach((review) => {
-    const lid = review.listing.toString();
-    if (!reviewsByListing[lid]) reviewsByListing[lid] = [];
-    reviewsByListing[lid].push(review);
-  });
-
   return listings.map((listing) => {
-    const reviews = reviewsByListing[listing._id.toString()] || [];
-    const totalRatings = reviews.length;
-    const avgRating =
-      totalRatings > 0
-        ? Number(
-          (reviews.reduce((sum, r) => sum + r.rating, 0) / totalRatings).toFixed(1)
-        )
-        : 0;
-    return { ...listing.toObject(), reviews, avgRating, totalRatings };
+    const item = listing.toObject ? listing.toObject() : listing;
+    return {
+      ...item,
+      avgRating: Number(item.avgRating || 0),
+      totalRatings: Number(item.totalRatings || 0)
+    };
   });
 };
 
@@ -41,7 +31,7 @@ module.exports.create = async (req, res) => {
     const files = req.files;
 
     if (!files?.mainImage) {
-      return res.json({
+      return res.status(400).json({
         success: false,
         message: "Main image is required",
       });
@@ -86,6 +76,7 @@ module.exports.create = async (req, res) => {
     });
 
     await listing.save();
+    invalidateListingCache();
     await Notification.create({
       user: req.user._id,
       title: "Listing",
@@ -161,16 +152,16 @@ module.exports.update = async (req, res) => {
     const listing = await Listing.findById(id);
 
     if (!listing) {
-      return res.json({
+      return res.status(404).json({
         success: false,
         message: "Listing not found",
       });
     }
 
     if (listing.owner.toString() !== req.user._id.toString()) {
-      return res.json({
+      return res.status(403).json({
         success: false,
-        message: "You are not owner of listing"
+        message: "You are not authorized to update this listing",
       });
     }
 
@@ -241,6 +232,7 @@ module.exports.update = async (req, res) => {
     }
 
     await listing.save();
+    invalidateListingCache(id);
     await Notification.create({
       user: listing.owner,
       title: "Listing",
@@ -261,12 +253,23 @@ module.exports.update = async (req, res) => {
 
 module.exports.all = async (req, res) => {
   try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = parseInt(req.query.limit) || 0;
-    const result = await Listing.find({}).limit(limit).populate("owner", "username image");
+
+    let query = Listing.find({ isActive: true }).populate("owner", "username image").sort({ createdAt: -1 });
+    if (limit > 0) {
+      const skip = (page - 1) * limit;
+      query = query.skip(skip).limit(limit);
+    }
+    const [totalCount, result] = await Promise.all([
+      Listing.countDocuments({ isActive: true }),
+      query
+    ]);
     const listingsWithRating = await attachRatings(result);
     res.json({
       success: true,
       count: listingsWithRating.length,
+      totalCount,
       listing: listingsWithRating,
     });
   } catch (error) {
@@ -283,20 +286,21 @@ module.exports.delete = async (req, res) => {
     const { id } = req.params;
     const listing = await Listing.findById(id);
     if (!listing) {
-      return res.json({
+      return res.status(404).json({
         success: false,
         message: "Listing not found"
       });
     }
 
     if (listing.owner.toString() !== req.user._id.toString()) {
-      return res.json({
+      return res.status(403).json({
         success: false,
-        message: "You are not the owner of this listing"
+        message: "You are not authorized to delete this listing"
       });
     }
 
     await Listing.findByIdAndDelete(id);
+    invalidateListingCache(id);
     await Rating.deleteMany({ listing: id });
     await Notification.create({
       user: listing.owner,
@@ -373,7 +377,11 @@ module.exports.explore = async (req, res) => {
   try {
     const { location, type, priceRange, amenities } = req.query;
 
-    let filter = {};
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 12));
+    const skip = (page - 1) * limit;
+
+    let filter = { isActive: true };
 
     if (location) {
       const safeLocation = escapeRegex(location);
@@ -411,11 +419,29 @@ module.exports.explore = async (req, res) => {
       }
     }
 
-    const listings = await Listing.find(filter).populate("owner", "username image");
+    const [totalCount, listings] = await Promise.all([
+      Listing.countDocuments(filter),
+      Listing.find(filter)
+        .skip(skip)
+        .limit(limit)
+        .populate("owner", "username image")
+        .sort({ createdAt: -1 })
+    ]);
+
     const listingsWithRating = await attachRatings(listings);
+    const totalPages = Math.ceil(totalCount / limit);
+
     res.json({
       success: true,
-      listings: listingsWithRating
+      listings: listingsWithRating,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
     });
   } catch (error) {
     res.status(500).json({
@@ -452,10 +478,11 @@ module.exports.destinationFinder = async (req, res) => {
     if (minGuests && !isNaN(Number(minGuests))) {
       filter.personsPerRoom = { $gte: Number(minGuests) };
     }
-    const matchedListings = await Listing.find(filter).populate("owner", "username image");
-    const listingsWithRating = await attachRatings(matchedListings);
-    listingsWithRating.sort((a, b) => b.avgRating - a.avgRating);
-    const top5Listings = listingsWithRating.slice(0, 5);
+    const top5Listings = await Listing.find(filter)
+      .sort({ avgRating: -1 })
+      .limit(5)
+      .populate("owner", "username image");
+
     res.json({
       success: true,
       count: top5Listings.length,
@@ -492,20 +519,21 @@ module.exports.hostDelete = async (req, res) => {
     const { id } = req.params;
     const listing = await Listing.findById(id);
     if (!listing) {
-      return res.json({
+      return res.status(404).json({
         success: false,
         message: "Listing not found"
       });
     }
 
     if (listing.owner.toString() !== req.user._id.toString()) {
-      return res.json({
+      return res.status(403).json({
         success: false,
-        message: "You are not the owner of this listing"
+        message: "You are not authorized to delete this listing"
       });
     }
 
     await Listing.findByIdAndDelete(id);
+    invalidateListingCache(id);
     await Rating.deleteMany({ listing: id });
     await Notification.create({
       user: listing.owner,
@@ -554,6 +582,7 @@ module.exports.adminUpdateStatus = async (req, res) => {
 
     listing.isActive = isActive;
     await listing.save();
+    invalidateListingCache(id);
     await Notification.create({
       user: listing.owner,
       title: "Listing",
@@ -585,6 +614,7 @@ module.exports.adminDelete = async (req, res) => {
     }
 
     await Listing.findByIdAndDelete(id);
+    invalidateListingCache(id);
     await Rating.deleteMany({ listing: id });
     await Notification.create({
       user: listing.owner,
@@ -603,3 +633,147 @@ module.exports.adminDelete = async (req, res) => {
   }
 };
 
+module.exports.aiSearch = async (req, res) => {
+  try {
+    const { query } = req.body;
+
+    if (!query || query.trim() === "") {
+      return res.status(404).json({
+        success: false,
+        message: "Search prompt is required"
+      });
+    }
+
+    const cacheKey = `ai_search_${query.toLowerCase().trim()}`;
+    const cached = aiSearchCache.get(cacheKey);
+
+    if (cached) {
+      return res.json({
+        success: true,
+        cached: true,
+        ...cached
+      });
+    }
+
+    const filters = await parseSearch(query);
+
+    let mongoFilter = { isActive: true };
+
+    if (filters.destination) {
+      const safeLoc = filters.destination.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      mongoFilter.$or = [
+        { city: { $regex: safeLoc, $options: "i" } },
+        { state: { $regex: safeLoc, $options: "i" } },
+        { country: { $regex: safeLoc, $options: "i" } },
+        { address: { $regex: safeLoc, $options: "i" } },
+        { title: { $regex: safeLoc, $options: "i" } }
+      ];
+    }
+
+    if (filters.type) {
+      mongoFilter.type = filters.type;
+    }
+
+    if (filters.maxPrice && filters.maxPrice > 0) {
+      mongoFilter["pricing.price"] = { $lte: Number(filters.maxPrice) };
+    }
+
+    if (filters.minGuests && filters.minGuests > 0) {
+      mongoFilter.personsPerRoom = { $gte: Number(filters.minGuests) };
+    }
+    if (filters.amenities && filters.amenities.length > 0) {
+      mongoFilter.amenities = { $in: filters.amenities };
+    }
+
+    let listings = await Listing.find(mongoFilter).lean().limit(20);
+
+    if (listings.length === 0 && (filters.destination || filters.type)) {
+      const fallbackFilter = { isActive: true };
+      if (filters.destination) {
+        const safeLoc = escapeRegex(filters.destination);
+        fallbackFilter.$or = [
+          { city: { $regex: safeLoc, $options: "i" } },
+          { state: { $regex: safeLoc, $options: "i" } },
+          { country: { $regex: safeLoc, $options: "i" } },
+          { title: { $regex: safeLoc, $options: "i" } }
+        ];
+      } else if (filters.type) {
+        fallbackFilter.type = filters.type;
+      }
+      listings = await Listing.find(fallbackFilter).lean().limit(20);
+    }
+
+    const populatedListings = await attachRatings(listings);
+
+    const response = {
+      query,
+      filters,
+      explanation: filters.explanation,
+      count: populatedListings.length,
+      listings: populatedListings
+    };
+
+    aiSearchCache.set(cacheKey, response);
+    res.json({
+      success: true,
+      cached: false,
+      ...response
+    });
+  } catch (error) {
+    console.error("AI Search Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "AI Search failed to process. Please try again."
+    });
+  }
+};
+
+module.exports.generateCopy = async (req, res) => {
+  try {
+    const { propertyType, city, country, amenities, notes } = req.body;
+
+    const copyData = await generateListingCopy({
+      propertyType,
+      city,
+      country,
+      amenities: Array.isArray(amenities) ? amenities : [],
+      notes
+    });
+    res.json({
+      success: true,
+      copy: copyData
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate listing copy"
+    })
+  }
+};
+
+module.exports.suggestPricing = async (req, res) => {
+  try {
+    const { propertyType, city, country, bedrooms, bathrooms, personsPerRoom, amenities } = req.body;
+
+    const pricingData = await suggestPricing({
+      propertyType,
+      city,
+      country,
+      bedrooms,
+      bathrooms,
+      personsPerRoom,
+      amenities: Array.isArray(amenities) ? amenities : []
+    });
+
+    res.json({
+      success: true,
+      pricing: pricingData
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to suggest dynamic pricing. Please try again."
+    });
+  }
+};

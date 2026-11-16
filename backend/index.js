@@ -45,14 +45,32 @@ const limiter = rateLimit({
 app.use(limiter);
 
 app.use("/uploads", express.static(path.resolve("uploads")));
+const isProduction = process.env.NODE_ENV === "production";
+const allowedOrigins = [
+  process.env.FRONT_URL,
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:3000"
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.FRONT_URL,
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(cookieParser());
 
 app.use(
@@ -68,9 +86,9 @@ app.use(
 
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: "none",
       path: "/",
     },
   })
@@ -89,6 +107,23 @@ passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
 
 app.use(requestIp.mw());
+
+const logBuffer = [];
+const MAX_BUFFER_SIZE = 50;
+const BUFFER_SAFETY_CAP = 500;
+
+const flushVisitorLogs = async () => {
+  if (logBuffer.length === 0) return;
+  const batch = logBuffer.splice(0, logBuffer.length);
+  try {
+    await VisitorLog.insertMany(batch, { ordered: false });
+  } catch (err) {
+    console.error("Batch visitor log error:", err.message);
+  }
+};
+
+const logFlushInterval = setInterval(flushVisitorLogs, 10000);
+if (logFlushInterval.unref) logFlushInterval.unref();
 
 app.use((req, res, next) => {
 
@@ -118,9 +153,14 @@ app.use((req, res, next) => {
       logData.longitude = geo.ll[1];
     }
   }
-  VisitorLog.create(logData).catch((err) => {
-    console.error("Failed to save visitor log:", err.message);
-  });
+
+  if (logBuffer.length < BUFFER_SAFETY_CAP) {
+    logBuffer.push(logData);
+  }
+
+  if (logBuffer.length >= MAX_BUFFER_SIZE) {
+    setImmediate(flushVisitorLogs);
+  }
 
   next();
 });

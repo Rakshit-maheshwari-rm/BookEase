@@ -2,10 +2,14 @@ import { useState, useEffect } from "react";
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useNavigate, useParams } from "react-router-dom";
+import AICopywriterModal from "../../components/AICopywriterModal";
+import AIPricingAdvisorModal from "../../components/AIPricingAdvisorModal";
 
 function ListingEdit() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const [showAiCopyModal, setShowAiCopyModal] = useState(false);
+    const [showPricingModal, setShowPricingModal] = useState(false);
     const [form, setForm] = useState({
         title: "",
         type: "house",
@@ -195,7 +199,16 @@ function ListingEdit() {
                             <h3 className="mb-4">Basic Information</h3>
                             <div className="row">
                                 <div className="col-md-8 mb-4">
-                                    <label className="form-label">Property Title</label>
+                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                        <label className="form-label mb-0">Property Title</label>
+                                        <button
+                                            type="button"
+                                            className="ai-copywriter-trigger-btn"
+                                            onClick={() => setShowAiCopyModal(true)}
+                                        >
+                                            <i className="fa-solid fa-wand-magic-sparkles"></i> AI Copywriter
+                                        </button>
+                                    </div>
                                     <input
                                         type="text"
                                         name="title"
@@ -286,7 +299,16 @@ function ListingEdit() {
                                 </div>
                             </div>
                             <div className="mb-4">
-                                <label className="form-label">Description</label>
+                                <div className="d-flex justify-content-between align-items-center mb-2">
+                                    <label className="form-label mb-0">Description</label>
+                                    <button
+                                        type="button"
+                                        className="ai-copywriter-trigger-btn"
+                                        onClick={() => setShowAiCopyModal(true)}
+                                    >
+                                        <i className="fa-solid fa-wand-magic-sparkles"></i> AI Copywriter
+                                    </button>
+                                </div>
                                 <textarea
                                     name="description"
                                     className="form-control"
@@ -298,7 +320,16 @@ function ListingEdit() {
                                 ></textarea>
                             </div>
 
-                            <h3 className="mb-4 mt-5">Pricing & Capacity</h3>
+                            <div className="d-flex justify-content-between align-items-center mb-4 mt-5">
+                                <h3 className="mb-0">Pricing & Capacity</h3>
+                                <button
+                                    type="button"
+                                    className="ai-pricing-trigger-btn"
+                                    onClick={() => setShowPricingModal(true)}
+                                >
+                                    <i className="fa-solid fa-chart-line me-1"></i> AI Pricing Advisor
+                                </button>
+                            </div>
                             <div className="row">
                                 <div className="col-md-3 mb-4">
                                     <label className="form-label">Price per Night (INR)</label>
@@ -467,6 +498,49 @@ function ListingEdit() {
                     </div>
                 </div>
             </div>
+
+            <AICopywriterModal
+                show={showAiCopyModal}
+                onClose={() => setShowAiCopyModal(false)}
+                onApply={({ title, description }) => {
+                    setForm((prev) => ({
+                        ...prev,
+                        title: title || prev.title,
+                        description: description || prev.description
+                    }));
+                }}
+                initialData={{
+                    propertyType: form.type,
+                    city: form.city,
+                    country: form.country,
+                    amenities: form.amenities
+                }}
+            />
+
+            <AIPricingAdvisorModal
+                show={showPricingModal}
+                onClose={() => setShowPricingModal(false)}
+                onApply={({ price, cleaningFee, serviceFee }) => {
+                    setForm((prev) => ({
+                        ...prev,
+                        pricing: {
+                            ...prev.pricing,
+                            price: price !== undefined ? price : prev.pricing.price,
+                            cleaningFee: cleaningFee !== undefined ? cleaningFee : prev.pricing.cleaningFee,
+                            serviceFee: serviceFee !== undefined ? serviceFee : prev.pricing.serviceFee
+                        }
+                    }));
+                }}
+                propertyData={{
+                    propertyType: form.type,
+                    city: form.city,
+                    country: form.country,
+                    bedrooms: form.bedrooms,
+                    bathrooms: form.bathrooms,
+                    personsPerRoom: form.personsPerRoom,
+                    amenities: form.amenities
+                }}
+            />
         </div>
     );
 }

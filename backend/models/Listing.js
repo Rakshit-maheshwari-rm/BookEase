@@ -130,10 +130,31 @@ const ListingSchema = new mongoose.Schema(
         ref: "Rating",
       },
     ],
+
+    avgRating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+      index: true,
+    },
+
+    totalRatings: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+ListingSchema.index({ isActive: 1, type: 1, "pricing.price": 1 });
+ListingSchema.index({ city: 1, state: 1, country: 1 });
+ListingSchema.index({ owner: 1, isActive: 1 });
+ListingSchema.index({ createdAt: -1 });
+ListingSchema.index({ isActive: 1, personsPerRoom: 1, "pricing.price": 1 });
+ListingSchema.index({ avgRating: -1 });
 
 module.exports = mongoose.model('Listing', ListingSchema);

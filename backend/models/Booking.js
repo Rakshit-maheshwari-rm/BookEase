@@ -49,6 +49,11 @@ const bookingSchema = new mongoose.Schema({
         enum: ["pending", "confirmed", "cancelled"],
         default: "pending"
     },
+    orderId: {
+        type: String,
+        default: null,
+        index: true,
+    },
     paymentId: {
         type: String,
         default: null
@@ -57,9 +62,18 @@ const bookingSchema = new mongoose.Schema({
         type: String,
         enum: ["none", "processed", "failed"],
         default: "none"
+    },
+    expiresAt: {
+        type: Date,
+        default: () => new Date(Date.now() + 15 * 60 * 1000),
+        index: { expires: '0s', partialFilterExpression: { status: 'pending' } }
     }
 }, { timestamps: true }
 );
+
+bookingSchema.index({ listing: 1, status: 1, checkIn: 1, checkOut: 1 });
+bookingSchema.index({ host: 1, createdAt: -1 });
+bookingSchema.index({ user: 1, createdAt: -1 });
 
 bookingSchema.pre('validate', function () {
     if (!this.bookingId) {

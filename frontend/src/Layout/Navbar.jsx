@@ -1,4 +1,4 @@
-import { Navigate, NavLink, useNavigate } from "react-router-dom";
+import { Navigate, NavLink, useNavigate, Link } from "react-router-dom";
 import "./Style.css"
 import { useContext, useState } from "react";
 import { AuthContext } from "../context/AuthContext";
@@ -6,6 +6,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import LazyImage from "../components/LazyImage";
 import { useCurrency } from "../context/CurrencyContext";
+import AISearchModal from "../components/AISearchModal";
 
 const categories = [
     "Luxury Villa", "Beachfront", "Mountain Cabin", "Urban Apartment",
@@ -28,6 +29,7 @@ function Navbar() {
     });
     const [result, setResult] = useState(null);
     const navigate = useNavigate();
+    const [showAiModal, setShowAiModal] = useState(false);
     const logout = async () => {
         try {
             await axios.post(`${import.meta.env.VITE_BACKEND_URL}/logout`, {}, { withCredentials: true });
@@ -145,16 +147,16 @@ function Navbar() {
                                     </a>
                                     <ul className="dropdown-menu custom-dropdown dropdown-menu-end">
                                         {user?.role === 'host' &&
-                                            <li><a className="dropdown-item" href="/dashboard">Dashboard</a></li>
+                                            <li><Link className="dropdown-item" to="/dashboard">Dashboard</Link></li>
                                         }
                                         {user?.role === 'admin' &&
-                                            <li><a className="dropdown-item" href="/admin-dashboard">Admin Dashboard</a></li>
+                                            <li><Link className="dropdown-item" to="/admin-dashboard">Admin Dashboard</Link></li>
                                         }
-                                        <li><a className="dropdown-item" href="/profile">Profile</a></li>
-                                        <li><a className="dropdown-item" href="/bookings">Bookings</a></li>
-                                        <li><a className="dropdown-item" href="/reviews">Reviews</a></li>
-                                        <li><a className="dropdown-item" href="/favorites">Favorites</a></li>
-                                        <li><a className="dropdown-item" href="/notifications">Notifications</a></li>
+                                        <li><Link className="dropdown-item" to="/profile">Profile</Link></li>
+                                        <li><Link className="dropdown-item" to="/bookings">Bookings</Link></li>
+                                        <li><Link className="dropdown-item" to="/reviews">Reviews</Link></li>
+                                        <li><Link className="dropdown-item" to="/favorites">Favorites</Link></li>
+                                        <li><Link className="dropdown-item" to="/notifications">Notifications</Link></li>
                                         <li><a className="dropdown-item" href="#" onClick={logout}>Logout</a></li>
                                     </ul>
                                 </li>
@@ -166,13 +168,13 @@ function Navbar() {
                             <ul className="navbar-nav flex-column gap-0 fs-5">
                                 {user ? (
                                     <>
-                                        <li className="nav-item mb-2"><a className="nav-link custom-link d-flex align-items-center" href="/profile"><i className="fa-regular fa-user fa-fw me-3 text-secondary"></i> Profile</a></li>
-                                        <li className="nav-item mb-2"><a className="nav-link custom-link d-flex align-items-center" href="/bookings"><i className="fa-solid fa-suitcase-rolling fa-fw me-3 text-secondary"></i> Bookings</a></li>
-                                        {user.role === 'host' && <li className="nav-item mb-2"><a className="nav-link custom-link d-flex align-items-center" href="/dashboard"><i className="fa-solid fa-chart-pie fa-fw me-3 text-secondary"></i> Dashboard</a></li>}
-                                        {user.role === 'admin' && <li className="nav-item mb-2"><a className="nav-link custom-link d-flex align-items-center" href="/admin-dashboard"><i className="fa-solid fa-screwdriver-wrench fa-fw me-3 text-secondary"></i> Admin Dashboard</a></li>}
-                                        <li className="nav-item mb-2"><a className="nav-link custom-link d-flex align-items-center" href="/reviews"><i className="fa-regular fa-star fa-fw me-3 text-secondary"></i> Reviews</a></li>
-                                        <li className="nav-item mb-2"><a className="nav-link custom-link d-flex align-items-center" href="/favorites"><i className="fa-regular fa-heart fa-fw me-3 text-secondary"></i> Favorites</a></li>
-                                        <li className="nav-item mb-2"><a className="nav-link custom-link d-flex align-items-center" href="/notifications"><i className="fa-regular fa-bell fa-fw me-3 text-secondary"></i> Notifications</a></li>
+                                        <li className="nav-item mb-2"><Link className="nav-link custom-link d-flex align-items-center" to="/profile"><i className="fa-regular fa-user fa-fw me-3 text-secondary"></i> Profile</Link></li>
+                                        <li className="nav-item mb-2"><Link className="nav-link custom-link d-flex align-items-center" to="/bookings"><i className="fa-solid fa-suitcase-rolling fa-fw me-3 text-secondary"></i> Bookings</Link></li>
+                                        {user.role === 'host' && <li className="nav-item mb-2"><Link className="nav-link custom-link d-flex align-items-center" to="/dashboard"><i className="fa-solid fa-chart-pie fa-fw me-3 text-secondary"></i> Dashboard</Link></li>}
+                                        {user.role === 'admin' && <li className="nav-item mb-2"><Link className="nav-link custom-link d-flex align-items-center" to="/admin-dashboard"><i className="fa-solid fa-screwdriver-wrench fa-fw me-3 text-secondary"></i> Admin Dashboard</Link></li>}
+                                        <li className="nav-item mb-2"><Link className="nav-link custom-link d-flex align-items-center" to="/reviews"><i className="fa-regular fa-star fa-fw me-3 text-secondary"></i> Reviews</Link></li>
+                                        <li className="nav-item mb-2"><Link className="nav-link custom-link d-flex align-items-center" to="/favorites"><i className="fa-regular fa-heart fa-fw me-3 text-secondary"></i> Favorites</Link></li>
+                                        <li className="nav-item mb-2"><Link className="nav-link custom-link d-flex align-items-center" to="/notifications"><i className="fa-regular fa-bell fa-fw me-3 text-secondary"></i> Notifications</Link></li>
                                         <li className="nav-item mt-3 pt-3 border-top border-secondary border-opacity-25"><a className="nav-link text-danger d-flex align-items-center" href="#" onClick={logout}><i className="fa-solid fa-arrow-right-from-bracket fa-fw me-3"></i> Logout</a></li>
                                     </>
                                 ) : (
@@ -213,7 +215,32 @@ function Navbar() {
                             <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div className="modal-body">
-                            <form className="user-data-form mt-4" onSubmit={handleSubmit}>
+                            <div className="ai-modal-promo-banner d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-3">
+                                <div className="d-flex align-items-center gap-3">
+                                    <i className="fa-solid fa-wand-magic-sparkles ai-modal-promo-icon"></i>
+                                    <div>
+                                        <div className="d-flex align-items-center gap-2">
+                                            <h6 className="text-white mb-0 fw-semibold">Try AI Vibe Matcher</h6>
+                                            <span className="badge ai-vibe-badge ai-promo-badge text-white">NEW</span>
+                                        </div>
+                                        <p className="text-secondary small mb-0 mt-1">
+                                            Describe your dream stay in plain English
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="btn btn-sm text-white px-3 py-2 fw-semibold ai-vibe-btn text-nowrap"
+                                    data-bs-dismiss="modal"
+                                    onClick={() => setShowAiModal(true)}>Ask AI <i className="fa-solid fa-arrow-right ms-1"></i>
+                                </button>
+                            </div>
+
+                            <div className="ai-modal-divider">
+                                <span>or search with filters</span>
+                            </div>
+
+                            <form className="user-data-form mt-3" onSubmit={handleSubmit}>
                                 <div className="row">
                                     <div className="col-12 col-md-6 mb-4">
                                         <label htmlFor="location" className="form-label">Location</label>
@@ -251,11 +278,12 @@ function Navbar() {
                                 </div>
                             </form>
                             {result !== null && (
-                                result.length > 0 ? <div>
-                                    <div className="d-flex flex-wrap justify-content-center justify-content-md-start gap-4 mt-5">
+                                result.length > 0 ? (
+                                    <div className="row g-4 mt-4">
                                         {result?.map((item) => (
-                                            <a className="text-decoration-none text-reset" key={item._id} href={`/listing/${item._id}`}>
-                                                <div className="card px-0 border-0 listing-card custom-list-card" key={item._id}>
+                                            <div className="col-12 col-sm-6 col-md-4 col-xl-3" key={item._id}>
+                                                <a className="text-decoration-none text-reset h-100 d-block" href={`/listing/${item._id}`}>
+                                                    <div className="card px-0 border-0 listing-card custom-list-card h-100">
                                                     <LazyImage src={item?.images?.mainImage?.startsWith?.('http') ? item.images.mainImage : `${import.meta.env.VITE_BACKEND_URL}/uploads/${item?.images?.mainImage}`} className="card-img-top" alt="listings image" />
                                                     <div className="card-img-overlay d-flex flex-column">
                                                         <div className="d-flex justify-content-end">
@@ -282,11 +310,12 @@ function Navbar() {
                                                             <p className="text-12 mb-0 pt-2">Listed {getDaysAgo(item?.createdAt)} days ago</p>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </a>
+                                                    </div>
+                                                </a>
+                                            </div>
                                         ))}
                                     </div>
-                                </div> : <div>
+                                ) : <div>
                                     <h4 className="text-white text-center mt-5">No destinations found matching your criteria. Try adjusting your search!</h4>
                                 </div>
                             )}
@@ -294,6 +323,7 @@ function Navbar() {
                     </div>
                 </div>
             </div>
+            <AISearchModal show={showAiModal} onClose={() => setShowAiModal(false)} />
         </nav>
     )
 }

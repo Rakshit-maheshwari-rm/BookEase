@@ -7,7 +7,7 @@ const Listing = require("../models/Listing");
 
 module.exports.signup = async (req, res) => {
   try {
-    const { email, username, password, role, phone } = req.body;
+    const { email, username, password, phone } = req.body;
     if (!email || !username || !password)
       return res.status(400).json({ error: "All fields are required" });
 
@@ -17,7 +17,7 @@ module.exports.signup = async (req, res) => {
       image = req.file.path || req.file.filename;
     }
 
-    const user = new User({ email, username, role, phone, image });
+    const user = new User({ email, username, role: "user", phone, image });
     const newUser = await User.register(user, password);
 
     req.login(newUser, (err) => {
@@ -104,35 +104,15 @@ module.exports.checkUser = async (req, res) => {
 
   try {
     const user = await User.findById(req.user._id).populate('favorites');
+    if (!user) return res.json({ loggedIn: false });
 
-    const listingIds = user.favorites.map(f => f._id);
-    const allReviews = await Rating.find({ listing: { $in: listingIds } }).populate("owner", "username createdAt image description");
-
-    const reviewsByListing = {};
-    allReviews.forEach(review => {
-      const lid = review.listing.toString();
-      if (!reviewsByListing[lid]) reviewsByListing[lid] = [];
-      reviewsByListing[lid].push(review);
-    });
-
-    const favoritesWithRating = user.favorites.map((listing) => {
-      const reviews = reviewsByListing[listing._id.toString()] || [];
-      const totalRatings = reviews.length;
-      const avgRating =
-        totalRatings > 0
-          ? (
-            reviews.reduce(
-              (sum, review) => sum + review.rating,
-              0
-            ) / totalRatings
-          ).toFixed(1)
-          : 0;
-
+    const validFavorites = (user.favorites || []).filter(Boolean);
+    const favoritesWithRating = validFavorites.map((listing) => {
+      const obj = listing.toObject ? listing.toObject() : listing;
       return {
-        ...listing.toObject(),
-        reviews,
-        avgRating: Number(avgRating),
-        totalRatings,
+        ...obj,
+        avgRating: Number(obj.avgRating || 0),
+        totalRatings: Number(obj.totalRatings || 0),
       };
     });
 
@@ -324,67 +304,76 @@ module.exports.update = async (req, res) => {
 
 module.exports.addToFavorites = async (req, res) => {
   const { id } = req.params;
-  const user = req.user;
+  const userId = req.user._id;
+
   try {
     const listing = await Listing.findById(id);
     if (!listing) {
-      return res.json({
+      return res.status(404).json({
         success: false,
         message: "Listing not found",
       });
     }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
     const isFavorite = user.favorites.some(fav => fav.toString() === id);
+
     if (isFavorite) {
-      user.favorites = user.favorites.filter(item => item.toString() !== id);
-      await user.save();
-      return res.json({
+      await User.findByIdAndUpdate(userId, { $pull: { favorites: id } });
+      return res.status(200).json({
         success: true,
         message: "Listing removed from favorites",
       });
+    } else {
+      await User.findByIdAndUpdate(userId, { $addToSet: { favorites: id } });
+      return res.status(200).json({
+        success: true,
+        message: "Listing added in favorites",
+      });
     }
-    user.favorites.push(id);
-    await user.save();
-    return res.json({
-      success: true,
-      message: "Listing added in favorites",
-    });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Something went wrong"
+      message: "Something went wrong updating favorites",
     });
   }
 };
 
 module.exports.removeFromFavorites = async (req, res) => {
   const { id } = req.params;
-  const user = req.user;
+  const userId = req.user._id;
+
   try {
     const listing = await Listing.findById(id);
     if (!listing) {
-      return res.json({
+      return res.status(404).json({
         success: false,
         message: "Listing not found",
       });
     }
-    if (!user.favorites.includes(id)) {
-      return res.json({
-        success: false,
-        message: "Listing not added in favorites",
-      });
-    }
-    if (user.favorites.includes(id)) {
-      user.favorites = user.favorites.filter(item => item.toString() !== id);
-      await user.save();
-      return res.json({
-        success: true,
-        message: "Listing removed from favorites",
-      });
-    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $pull: { favorites: id } },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Listing removed from favorites",
+      favorites: updatedUser.favorites,
+    });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Something went wrong"
+      message: "Something went wrong removing favorite",
     });
   }
 };
